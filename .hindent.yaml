@@ -1,0 +1,8 @@
+indent-size: 2
+line-length: 180
+force-trailing-newline: true
+line-breaks: [":>", ":<|>"]
+extensions:
+  - DataKinds
+  - GADTs
+  - TypeApplications
