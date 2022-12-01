@@ -42,14 +42,17 @@ doTxAction (ConcreteDiscount amount) = do
   tx <- ask
   return $ max (T.total tx) amount
 
-process :: Promotion -> Reader Transaction (Maybe Float)
-process (Promotion condition action) = do
-  bool <- doTxCondition condition
-  if bool
-    then do
-      Just <$> doTxAction action
-    else do
-      return Nothing
+process :: Promotion -> Transaction -> Maybe Float
+process (Promotion condition action) = runReader reader
+  where
+    reader :: Reader Transaction (Maybe Float)
+    reader = do
+      bool <- doTxCondition condition
+      if bool
+        then do
+          Just <$> doTxAction action
+        else do
+          return Nothing
 
 matchProductItem :: Condition -> Item -> Bool
 matchProductItem (Product productId minQty) item =

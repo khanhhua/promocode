@@ -3,7 +3,7 @@ module Lang where
 import Data.Transaction
 
 data Condition
-  = Product {productId :: Int, minQty :: Int}
+  = Product {productId :: String, minQty :: Integer}
   | Sum {minTotal :: Float}
 
 data Action

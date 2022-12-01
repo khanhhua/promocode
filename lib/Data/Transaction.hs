@@ -1,8 +1,8 @@
 module Data.Transaction where
 
 data Item = Item
-  { productId :: Int
-  , qty :: Int
+  { productId :: String
+  , qty :: Integer
   , subtotal :: Float
   }
 
