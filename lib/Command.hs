@@ -15,7 +15,7 @@ import Data.Transaction as T
   )
 import Lang
   ( Action (..),
-    Condition (Product),
+    Condition (Product, Sum),
     Promotion (..),
   )
 
@@ -26,9 +26,13 @@ type Conditional = Reader Transaction Bool
 type Command = Reader Transaction Float
 
 doTxCondition :: Condition -> Conditional
-doTxCondition condition = do
+doTxCondition condition@(Product _ _) = do
   (Transaction items) <- ask
   return $ any (matchProductItem condition) items
+
+doTxCondition condition@(Sum minTotal) = do
+  tx <- ask
+  return $ total tx >= minTotal
 
 doTxAction :: Action -> Command
 doTxAction (TransactionDiscount rate) = do
