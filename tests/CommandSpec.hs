@@ -5,7 +5,8 @@ import Test.Hspec (Spec, describe, it, shouldBe)
 import Command ( process )
 import Data.Transaction ( Transaction(Transaction), Item(Item) )
 import Lang
-    ( Condition(Product), transactionDiscount, Promotion(Promotion) )
+    ( Condition(Product), Promotion(Promotion), Action (TransactionDiscount) )
+import Control.Monad.Reader (runReader)
 
 transaction :: Transaction
 transaction = Transaction [ Item 901 4 499
@@ -16,15 +17,15 @@ spec = do
   describe "process" $ do
     it "should execute action when condition is met" $ do
       let condition = Product 901 4
-          action = transactionDiscount
+          action = TransactionDiscount 0.01
           promotion = Promotion condition action
-          actual = process promotion transaction
-      actual `shouldBe` Just 1
+          actual = runReader (process promotion) transaction
+      actual `shouldBe` Just 4.99
 
     it "should not execute action due to unmet condition" $ do
       let condition = Product 901 5
-          action = transactionDiscount
+          action = TransactionDiscount 0.01
           promotion = Promotion condition action
-          actual = process promotion transaction
+          actual = runReader (process promotion) transaction
       actual `shouldBe` Nothing
 
