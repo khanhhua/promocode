@@ -1,7 +1,7 @@
 module Command
   ( doTxCondition,
     doTxAction,
-    process,
+    conditionalPromotion,
     Conditional,
     Command,
   )
@@ -17,13 +17,17 @@ import Lang
   ( Action (..),
     Condition (Product, Sum),
     Promotion (..),
+    ConditionalPromotion,
   )
+import Data.Offer (Offer (Discount))
 
 type Logs = [String]
 
 type Conditional = Reader Transaction Bool
 
-type Command = Reader Transaction Float
+type Command a = Reader Transaction a
+
+type TxAction a = Action a -> Command a
 
 doTxCondition :: Condition -> Conditional
 doTxCondition condition@(Product _ _) = do
@@ -34,18 +38,22 @@ doTxCondition condition@(Sum minTotal) = do
   tx <- ask
   return $ total tx >= minTotal
 
-doTxAction :: Action -> Command
+doTxAction :: TxAction Offer
+doTxAction (GiveOffer offer) = pure offer
+
 doTxAction (TransactionDiscount rate) = do
   tx <- ask
-  return $ T.total tx * rate
+  return $ Discount (T.total tx * rate)
 doTxAction (ConcreteDiscount amount) = do
   tx <- ask
-  return $ max (T.total tx) amount
+  return $ Discount (max (T.total tx) amount)
 
-process :: Promotion -> Transaction -> Maybe Float
-process (Promotion condition action) = runReader reader
+
+conditionalPromotion :: ConditionalPromotion Offer
+conditionalPromotion condition action = Promotion f
   where
-    reader :: Reader Transaction (Maybe Float)
+    f :: Transaction -> Maybe Offer
+    f = runReader reader
     reader = do
       bool <- doTxCondition condition
       if bool
@@ -53,6 +61,7 @@ process (Promotion condition action) = runReader reader
           Just <$> doTxAction action
         else do
           return Nothing
+
 
 matchProductItem :: Condition -> Item -> Bool
 matchProductItem (Product productId minQty) item =

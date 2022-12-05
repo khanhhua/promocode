@@ -1,11 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
-import Lang (Promotion(Promotion), Action (TransactionDiscount), Condition (Sum, productId))
+import Lang (Promotion(Promotion, runPromotion), Action (TransactionDiscount), Condition (Sum, productId))
 import Control.Monad.Reader (runReader)
 import Data.Transaction (Transaction(..), Item (Item))
-import Command (process)
+import Command (conditionalPromotion)
 import GHC.IO.Handle (hSetBuffering, BufferMode(NoBuffering))
 import System.IO (stdin, stdout)
+import Data.Offer (Offer)
 
 
 type Logs = [String]
@@ -20,11 +21,11 @@ productCatalog =
 condition :: Condition
 condition = Sum 498
 
-action :: Action
+action :: Action Offer
 action = TransactionDiscount 0.01
 
-promotion :: Promotion
-promotion = Promotion condition action
+promotion :: Promotion Offer
+promotion = conditionalPromotion condition action
 
 main :: IO ()
 main = do
@@ -35,7 +36,7 @@ main = do
   let maybeSubtotal = (* fromInteger qty) <$> lookup productId productCatalog
       maybeTx = (\subtotal -> Transaction [Item productId qty subtotal]) <$> maybeSubtotal
 
-      maybeDiscount = maybeTx >>= process promotion
+      maybeDiscount = maybeTx >>= runPromotion promotion
 
   case maybeDiscount of
     Nothing -> putStrLn "You have no promotion!"

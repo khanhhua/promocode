@@ -43,6 +43,7 @@ library promocode-lib
     -- Modules included in this executable, other than Main.
     exposed-modules:
         Data.Transaction
+      , Data.Offer
       , Lang
       , Parser
       , Command
