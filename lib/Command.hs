@@ -1,9 +1,7 @@
 module Command
-  ( doTxCondition,
-    doTxAction,
-    conditionalPromotion,
-    Conditional,
-    Command,
+  ( conditionalPromotion,
+    betterPromotion,
+    bestPromotion
   )
 where
 
@@ -16,51 +14,59 @@ import Data.Transaction as T
 import Lang
   ( Action (..),
     Condition (Product, Sum),
-    Promotion (..),
     ConditionalPromotion,
+    PromotionT,
+    runPromotion
   )
 import Data.Offer (Offer (Discount))
+import qualified Data.Functor
+import Data.Maybe (isNothing)
 
 type Logs = [String]
 
-type Conditional = Reader Transaction Bool
+type TxAction a = Action a -> PromotionT a
 
-type Command a = Reader Transaction a
-
-type TxAction a = Action a -> Command a
-
-doTxCondition :: Condition -> Conditional
+doTxCondition :: Condition -> PromotionT Bool
 doTxCondition condition@(Product _ _) = do
   (Transaction items) <- ask
-  return $ any (matchProductItem condition) items
+  pure . Just $ any (matchProductItem condition) items
 
 doTxCondition condition@(Sum minTotal) = do
   tx <- ask
-  return $ total tx >= minTotal
+  pure . Just $ total tx >= minTotal
 
 doTxAction :: TxAction Offer
-doTxAction (GiveOffer offer) = pure offer
+doTxAction (GiveOffer offer) = pure . Just $ offer
 
 doTxAction (TransactionDiscount rate) = do
   tx <- ask
-  return $ Discount (T.total tx * rate)
+  pure . Just $ Discount (T.total tx * rate)
 doTxAction (ConcreteDiscount amount) = do
   tx <- ask
-  return $ Discount (max (T.total tx) amount)
+  pure . Just $ Discount (max (T.total tx) amount)
 
 
-conditionalPromotion :: ConditionalPromotion Offer
-conditionalPromotion condition action = Promotion f
+conditionalPromotion :: Condition -> Action Offer -> PromotionT Offer
+conditionalPromotion condition action = do
+  maybeBool <- doTxCondition condition
+  case maybeBool of
+    Just True -> doTxAction action
+    _ -> pure Nothing
+
+
+betterPromotion :: PromotionT Offer -> PromotionT Offer -> PromotionT Offer
+betterPromotion promotionA promotionB = do
+  bestPromotion [promotionA, promotionB]
+
+bestPromotion :: [PromotionT Offer] -> PromotionT Offer
+bestPromotion = foldM f Nothing
   where
-    f :: Transaction -> Maybe Offer
-    f = runReader reader
-    reader = do
-      bool <- doTxCondition condition
-      if bool
-        then do
-          Just <$> doTxAction action
-        else do
-          return Nothing
+    f acc m = do
+      offer <- m
+      if isNothing offer then
+        pure acc
+      else
+        pure $ max acc offer
 
 
 matchProductItem :: Condition -> Item -> Bool
