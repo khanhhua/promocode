@@ -7,6 +7,6 @@ data Offer
 
 instance Ord Offer where
   Present a <= Present b = a <= b
-  Present a <= _ = False
+  Present _ <= _ = False
   Discount a <= Discount b = a <= b
-  Discount a <= _ = True
+  Discount _ <= _ = True

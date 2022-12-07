@@ -16,13 +16,14 @@ data Action a
   | TransactionDiscount Float
   | ConcreteDiscount Float
 
+data Promotion a = Promotion Condition (Action a)
+
 {-|
 Promotion of "a" is a transformation from transaction to some offer "a"
 -}
 type PromotionT a = Reader Transaction (Maybe a)
 
+type ConditionalPromotion a = Action a -> PromotionT a
+
 runPromotion :: PromotionT a -> Transaction -> Maybe a
 runPromotion = runReader
-    
-
-type ConditionalPromotion a = Condition -> Action a -> PromotionT a

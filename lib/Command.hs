@@ -1,7 +1,8 @@
 module Command
-  ( conditionalPromotion,
-    betterPromotion,
-    bestPromotion
+  ( App(..)
+  , runApp
+  , TxAction
+  , TxCondition
   )
 where
 
@@ -14,51 +15,36 @@ import Data.Transaction as T
 import Lang
   ( Action (..),
     Condition (Product, Sum),
-    ConditionalPromotion,
     PromotionT,
-    runPromotion
+    runPromotion, Promotion(..), ConditionalPromotion
   )
-import Data.Offer (Offer (Discount))
 import qualified Data.Functor
 import Data.Maybe (isNothing)
 
-type Logs = [String]
-
 type TxAction a = Action a -> PromotionT a
+type TxCondition = Condition -> PromotionT Bool
 
-doTxCondition :: Condition -> PromotionT Bool
-doTxCondition condition@(Product _ _) = do
-  (Transaction items) <- ask
-  pure . Just $ any (matchProductItem condition) items
-
-doTxCondition condition@(Sum minTotal) = do
-  tx <- ask
-  pure . Just $ total tx >= minTotal
-
-doTxAction :: TxAction Offer
-doTxAction (GiveOffer offer) = pure . Just $ offer
-
-doTxAction (TransactionDiscount rate) = do
-  tx <- ask
-  pure . Just $ Discount (T.total tx * rate)
-doTxAction (ConcreteDiscount amount) = do
-  tx <- ask
-  pure . Just $ Discount (max (T.total tx) amount)
+data (Ord a) => App a = App
+  { handleAction :: TxAction a
+  , promotions :: [Promotion a]
+  }
 
 
-conditionalPromotion :: Condition -> Action Offer -> PromotionT Offer
-conditionalPromotion condition action = do
+runApp :: (Ord a) => App a -> Transaction -> Maybe a
+runApp (App doTxAction promotions) =
+  let conditionalPromotions = map (makeConditionalPromotion doTxAction) promotions
+  in runPromotion (bestPromotion conditionalPromotions)
+
+
+makeConditionalPromotion :: TxAction a -> Promotion a -> PromotionT a
+makeConditionalPromotion doTxAction (Promotion condition action) = do
   maybeBool <- doTxCondition condition
   case maybeBool of
     Just True -> doTxAction action
     _ -> pure Nothing
 
 
-betterPromotion :: PromotionT Offer -> PromotionT Offer -> PromotionT Offer
-betterPromotion promotionA promotionB = do
-  bestPromotion [promotionA, promotionB]
-
-bestPromotion :: [PromotionT Offer] -> PromotionT Offer
+bestPromotion :: (Ord a) => [PromotionT a] -> PromotionT a
 bestPromotion = foldM f Nothing
   where
     f acc m = do
@@ -67,6 +53,16 @@ bestPromotion = foldM f Nothing
         pure acc
       else
         pure $ max acc offer
+
+
+doTxCondition :: TxCondition
+doTxCondition condition@(Product _ _) = do
+  (Transaction items) <- ask
+  pure . Just $ any (matchProductItem condition) items
+
+doTxCondition condition@(Sum minTotal) = do
+  tx <- ask
+  pure . Just $ total tx >= minTotal
 
 
 matchProductItem :: Condition -> Item -> Bool
